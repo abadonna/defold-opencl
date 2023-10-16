@@ -1,0 +1,12 @@
+# C++ symbol in your extension
+name: "OpenCL"
+
+platforms:
+    x86_64-osx:
+        context:
+            frameworks: ["OpenCL"]
+    win32:
+        context:
+            flags:        []
+            linkFlags:    []
+            

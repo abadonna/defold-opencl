@@ -1,0 +1,61 @@
+function init(self)
+
+	local buf = buffer.create(10, { -- input data for opencl kernel
+		{ name = hash("data1"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
+		{ name = hash("data2"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
+		{ name = hash("data3"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
+	})
+
+	local tstream1 = buffer.get_stream(buf, hash("data1"))
+	local tstream2 = buffer.get_stream(buf, hash("data2"))
+
+	for i = 1, 10 do
+		tstream1[i] = i;
+		tstream2[i] = i * 0.1;
+	end
+	
+	local src = sys.load_resource("/assets/add.c") -- opencl kernel code
+	
+	devices = opencl.get_devices()
+
+	for _, device in ipairs(devices) do
+		pprint("Calculating on device: " .. device.name)
+		local program = opencl.load_program(device.id, src)
+		local kernel = opencl.create_kernel(program, "parallel_add")
+		
+		opencl.set_kernel_arg_buffer(kernel, 0, buf, "data1", true)
+		opencl.set_kernel_arg_buffer(kernel, 1, buf, "data2", true)
+		opencl.set_kernel_arg_buffer(kernel, 2, buf, "data3", false, true)
+
+		local t = opencl.run_kernel(kernel, 1, {10})
+		pprint("Kernel run in " .. t .. " seconds")
+
+		pprint(opencl.read(kernel, 2, 10))
+	end
+
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Remove this function if not needed
+end
+
+function update(self, dt)
+	-- Add update code here
+	-- Remove this function if not needed
+end
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Remove this function if not needed
+end
+
+function on_input(self, action_id, action)
+	-- Add input-handling code here
+	-- Remove this function if not needed
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Remove this function if not needed
+end
