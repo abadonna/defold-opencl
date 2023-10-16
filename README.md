@@ -1,2 +1,2 @@
 # Defold-OpenCL
-Proof of concept: OpenCL in native extension for Defold.
+Proof of concept: OpenCL as native extension for Defold.
