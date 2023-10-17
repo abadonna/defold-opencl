@@ -1,17 +1,26 @@
 function init(self)
 
-	local buf = buffer.create(10, { -- input data for opencl kernel
+	local buf = buffer.create(10 * 3, { -- input data for opencl kernel
 		{ name = hash("data1"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
 		{ name = hash("data2"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
-		{ name = hash("data3"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
+		{ name = hash("data_out"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
+		
+		{ name = hash("vectors"), type = buffer.VALUE_TYPE_FLOAT32, count = 3 },
+		{ name = hash("vectors_out"), type = buffer.VALUE_TYPE_FLOAT32, count = 3 },
 	})
 
 	local tstream1 = buffer.get_stream(buf, hash("data1"))
 	local tstream2 = buffer.get_stream(buf, hash("data2"))
+	local tstream3 = buffer.get_stream(buf, hash("vectors"))
 
 	for i = 1, 10 do
 		tstream1[i] = i;
 		tstream2[i] = i * 0.1;
+		
+		tstream3[(i - 1) * 3 + 1] = math.random(1, 10)
+		tstream3[(i - 1) * 3 + 2] = math.random(1, 10)
+		tstream3[(i - 1) * 3 + 3] = math.random(1, 10)
+		
 	end
 	
 	local src = sys.load_resource("/assets/add.c") -- opencl kernel code
@@ -26,7 +35,7 @@ function init(self)
 		
 		kernel:set_arg_buffer(1, buf, "data1", true) -- first argument, read only
 		kernel:set_arg_buffer(2, buf, "data2", true) --  second argument, read only
-		kernel:set_arg_buffer(3, buf, "data3", false, true) -- third argument, result - write only
+		kernel:set_arg_buffer(3, buf, "data_out", false, true) -- third argument, result - write only
 
 		local sec = kernel:run(1, {10})
 
@@ -35,6 +44,19 @@ function init(self)
 		pprint(kernel:read(3, 10)) -- read 10 values from 3rd argument (buffer) in kernels
 	end
 
+
+
+	--[[
+	local program = devices[2]:load_program(src)
+	local kernel = program:create_kernel("norm")
+	kernel:set_arg_buffer(1, buf, "vectors", true) 
+	kernel:set_arg_buffer(2, buf, "vectors_out", false, true) 
+
+	kernel:run(1, {10})
+	
+	pprint(kernel:read(2, 10))
+
+	--]]
 end
 
 function final(self)

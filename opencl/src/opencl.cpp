@@ -21,13 +21,24 @@ struct program_data {
     cl_context* context;
 };
 
+enum BUFFER_TYPE {
+    float_number,
+    vector3
+};
+
+struct buffer_data {
+    cl_mem mem;
+    BUFFER_TYPE type;
+};
+
 struct kernel_data {
     cl_kernel kernel;
-    cl_mem* buffers;
+    buffer_data* buffers;
     cl_uint args_count;
     cl_command_queue* queue;
     cl_context* context;
 };
+
 
 cl_platform_id platform_id;
 
@@ -50,7 +61,7 @@ static int Kernel_destroy(lua_State* L){
     dmLogInfo("kernel destroy");
     kernel_data* data = (kernel_data*)luaL_checkudata(L, 1, "kernel");
     for (int i = 0; i < data->args_count; i++) {
-        clReleaseMemObject(data->buffers[i]);
+        clReleaseMemObject(data->buffers[i].mem);
     }
     free(data->buffers);
     clReleaseKernel(data->kernel);
@@ -70,29 +81,6 @@ static int SetKernelArgBuffer(lua_State* L)
     bool read = lua_toboolean(L, 5);
     bool write = lua_toboolean(L, 6);
 
-    float* values = 0x0;
-    uint32_t count = 0;
-    uint32_t components = 0;
-    uint32_t stride = 0;
-    dmBuffer::Result dataResult = dmBuffer::GetStream(input, streamName, (void**)&values, &count, &components, &stride);
-    if (dataResult != dmBuffer::RESULT_OK) {
-        return DM_LUA_ERROR("can't get stream");
-    }
-    dmLogInfo("buffer %d, %d, %d", count,components, stride );
-
-    float array[count * components];
-
-    for (int i = 0; i < count; ++i) {
-        for (int c = 0; c < components; ++c)
-        {
-            //dmLogInfo("set %d, %f", i, values[c]);
-            array[i * components + c] = values[c];
-        }
-
-        values += stride;
-    }
-
-
     cl_mem_flags flags = CL_MEM_COPY_HOST_PTR;
 
     if (read && !write) {
@@ -103,18 +91,59 @@ static int SetKernelArgBuffer(lua_State* L)
         flags |= CL_MEM_READ_WRITE;
     }
 
-    cl_mem buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float) * count * components, array, NULL);
+    float* values = 0x0;
+    uint32_t count = 0;
+    uint32_t components = 0;
+    uint32_t stride = 0;
+    dmBuffer::Result dataResult = dmBuffer::GetStream(input, streamName, (void**)&values, &count, &components, &stride);
+    if (dataResult != dmBuffer::RESULT_OK) {
+        return DM_LUA_ERROR("can't get stream");
+    }
+    
+    //dmLogInfo("buffer %d, %d, %d", count,components, stride );
+
+    enum BUFFER_TYPE type = float_number;
+    cl_mem buf;
+    if (components == 3) { //create array of vec3!
+        type = vector3;
+        cl_float3 array[count];
+        for (int i = 0; i < count; ++i) {
+            array[i].x = values[0];
+            array[i].y = values[1];
+            array[i].z = values[2];
+            values += stride;
+        }
+
+        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float3) * count, array, NULL);
+
+    } else {
+        float array[count * components];
+
+        for (int i = 0; i < count; ++i) {
+            for (int c = 0; c < components; ++c)
+            {
+                //dmLogInfo("set %d, %f", i, values[c]);
+                array[i * components + c] = values[c];
+            }
+
+            values += stride;
+        }
+
+        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float) * count * components, array, NULL);
+    }
+    
     clSetKernelArg(kd->kernel, idx, sizeof(cl_mem), &buf);
 
     if (kd->args_count == 0) {
-        kd->buffers = (cl_mem*)malloc(sizeof(cl_mem) * (idx + 1));
+        kd->buffers = (buffer_data*)malloc(sizeof(buffer_data) * (idx + 1));
     }else if (kd->args_count <= idx) {
-        kd->buffers = (cl_mem*)realloc(kd->buffers, sizeof(cl_mem) * (idx + 1));
-    }else if (kd->buffers[kd->args_count] != NULL) {
-        clReleaseMemObject(kd->buffers[kd->args_count]);
+        kd->buffers = (buffer_data*)realloc(kd->buffers, sizeof(buffer_data) * (idx + 1));
+    }else if (kd->buffers[kd->args_count].mem != NULL) {
+        clReleaseMemObject(kd->buffers[kd->args_count].mem);
     }
 
-    kd->buffers[idx] = buf;
+    kd->buffers[idx].mem = buf;
+    kd->buffers[idx].type = type;
     kd->args_count = idx + 1 > kd->args_count ? idx + 1 : kd->args_count;
 
     return 0;
@@ -168,33 +197,74 @@ static int RunKernel(lua_State* L)
     return 1;
 }
 
+void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count) 
+{
+    float output[count];
+    
+    clEnqueueReadBuffer(queue,
+        buf,
+        CL_TRUE,
+        0,
+        sizeof(float) * count,
+        output,
+        0,
+        NULL,
+        NULL);
+
+    lua_newtable(L);
+
+    for (int i = 0; i < count; i++) {
+        lua_pushnumber(L, output[i]);
+        lua_rawseti(L, -2, i + 1);
+    }
+}
+
+void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count) 
+{
+    cl_float3 output[count];
+
+    clEnqueueReadBuffer(queue,
+        buf,
+        CL_TRUE,
+        0,
+        sizeof(cl_float3) * count,
+        output,
+        0,
+        NULL,
+        NULL);
+
+        dmLogInfo("output: %f", output[0].x);
+
+    lua_newtable(L);
+
+    for (int i = 0; i < count; i++) {
+        lua_newtable(L);
+       
+        lua_pushnumber(L, output[i].x);
+        lua_rawseti(L, -2, 1);
+        lua_pushnumber(L, output[i].y);
+        lua_rawseti(L, -2, 2);
+        lua_pushnumber(L, output[i].z);
+        lua_rawseti(L, -2, 3);
+
+        lua_rawseti(L, -2, i + 1);
+    }
+}
+
 static int ReadKernelBuffer(lua_State* L) 
 {
     DM_LUA_STACK_CHECK(L, 1);
 
     kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel");
     int idx = luaL_checkint(L, 2) - 1;
-    int count = luaL_checkint(L, 3);
+    size_t count = luaL_checkint(L, 3);
 
-    float output[count];
-
-    clEnqueueReadBuffer(*kd->queue,
-        kd->buffers[idx],
-        CL_TRUE,
-        0,
-        sizeof(cl_float) * count,
-        output,
-        0,
-        NULL,
-        NULL);
-
-
-        lua_newtable(L);
-
-        for (int i = 0; i < count; i++) {
-            lua_pushnumber(L, output[i]);
-            lua_rawseti(L, -2, i + 1);
-        }
+  
+    if (kd->buffers[idx].type == vector3) {
+        ReadVectors3(L, *kd->queue, kd->buffers[idx].mem, count);
+    } else {
+        ReadFloats(L, *kd->queue, kd->buffers[idx].mem, count);
+    }
 
     return 1;
 }
