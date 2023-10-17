@@ -20,17 +20,19 @@ function init(self)
 
 	for _, device in ipairs(devices) do
 		pprint("Calculating on device: " .. device.name)
-		local program = opencl.load_program(device.id, src)
-		local kernel = opencl.create_kernel(program, "parallel_add")
 		
-		opencl.set_kernel_arg_buffer(kernel, 0, buf, "data1", true)
-		opencl.set_kernel_arg_buffer(kernel, 1, buf, "data2", true)
-		opencl.set_kernel_arg_buffer(kernel, 2, buf, "data3", false, true)
+		local program = device:load_program(src)
+		local kernel = program:create_kernel("parallel_add")
+		
+		kernel:set_arg_buffer(1, buf, "data1", true) -- first argument, read only
+		kernel:set_arg_buffer(2, buf, "data2", true) --  second argument, read only
+		kernel:set_arg_buffer(3, buf, "data3", false, true) -- third argument, result - write only
 
-		local t = opencl.run_kernel(kernel, 1, {10})
-		pprint("Kernel run in " .. t .. " seconds")
+		local sec = kernel:run(1, {10})
 
-		pprint(opencl.read(kernel, 2, 10))
+		pprint("Kernel run in " .. sec .. " seconds")
+
+		pprint(kernel:read(3, 10)) -- read 10 values from 3rd argument (buffer) in kernels
 	end
 
 end
