@@ -72,12 +72,15 @@ static int Kernel_destroy(lua_State* L){
 
 void AllocBufferData(kernel_data* kd, int idx)
 {
-    if (kd->args_count == 0) {
+    if (kd->buffers == NULL) {
         kd->buffers = (buffer_data*)malloc(sizeof(buffer_data) * (idx + 1));
     }else if (kd->args_count <= idx) {
         kd->buffers = (buffer_data*)realloc(kd->buffers, sizeof(buffer_data) * (idx + 1));
-    }else if (kd->buffers[kd->args_count].mem != NULL) {
-        clReleaseMemObject(kd->buffers[kd->args_count].mem);
+        for (int i = kd->args_count; i < idx + 1; i ++) {
+            kd->buffers[i].mem = NULL;
+        }
+    }else if (kd->buffers[idx].mem != NULL) {
+        clReleaseMemObject(kd->buffers[idx].mem);
     }
 
     kd->args_count = idx + 1 > kd->args_count ? idx + 1 : kd->args_count;
