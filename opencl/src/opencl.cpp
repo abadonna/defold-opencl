@@ -61,10 +61,73 @@ static int Kernel_destroy(lua_State* L){
     dmLogInfo("kernel destroy");
     kernel_data* data = (kernel_data*)luaL_checkudata(L, 1, "kernel");
     for (int i = 0; i < data->args_count; i++) {
-        clReleaseMemObject(data->buffers[i].mem);
+        if (data->buffers[i].mem != NULL) {
+            clReleaseMemObject(data->buffers[i].mem);
+        }
     }
     free(data->buffers);
     clReleaseKernel(data->kernel);
+    return 0;
+}
+
+void AllocBufferData(kernel_data* kd, int idx)
+{
+    if (kd->args_count == 0) {
+        kd->buffers = (buffer_data*)malloc(sizeof(buffer_data) * (idx + 1));
+    }else if (kd->args_count <= idx) {
+        kd->buffers = (buffer_data*)realloc(kd->buffers, sizeof(buffer_data) * (idx + 1));
+    }else if (kd->buffers[kd->args_count].mem != NULL) {
+        clReleaseMemObject(kd->buffers[kd->args_count].mem);
+    }
+
+    kd->args_count = idx + 1 > kd->args_count ? idx + 1 : kd->args_count;
+}
+
+static int SetKernelArgInt(lua_State* L)
+{
+    kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel"); 
+    int idx = luaL_checkint(L, 2) - 1; 
+    int value = luaL_checkint(L, 3); 
+    clSetKernelArg(kd->kernel, idx, sizeof(int), &value);
+    AllocBufferData(kd, idx);
+    kd->buffers[idx].mem = NULL;
+    return 0;
+}
+
+static int SetKernelArgFloat(lua_State* L)
+{
+    kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel"); 
+    int idx = luaL_checkint(L, 2) - 1; 
+    float value = luaL_checknumber(L, 3); 
+    clSetKernelArg(kd->kernel, idx, sizeof(float), &value);
+    AllocBufferData(kd, idx);
+    kd->buffers[idx].mem = NULL;
+    return 0;
+}
+
+static int SetKernelArgVec3(lua_State* L)
+{
+    kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel"); 
+    int idx = luaL_checkint(L, 2) - 1; 
+
+    cl_float3 value;
+    
+    lua_rawgeti(L, 3, 1);
+    value.x = luaL_checknumber(L, -1);
+    lua_pop(L, 1);
+
+    lua_rawgeti(L, 3, 2);
+    value.y = luaL_checknumber(L, -1);
+    lua_pop(L, 1);
+
+    lua_rawgeti(L, 3, 3);
+    value.z = luaL_checknumber(L, -1);
+    lua_pop(L, 1);
+    
+    
+    clSetKernelArg(kd->kernel, idx, sizeof(cl_float3), &value);
+    AllocBufferData(kd, idx);
+    kd->buffers[idx].mem = NULL;
     return 0;
 }
 
@@ -134,17 +197,10 @@ static int SetKernelArgBuffer(lua_State* L)
     
     clSetKernelArg(kd->kernel, idx, sizeof(cl_mem), &buf);
 
-    if (kd->args_count == 0) {
-        kd->buffers = (buffer_data*)malloc(sizeof(buffer_data) * (idx + 1));
-    }else if (kd->args_count <= idx) {
-        kd->buffers = (buffer_data*)realloc(kd->buffers, sizeof(buffer_data) * (idx + 1));
-    }else if (kd->buffers[kd->args_count].mem != NULL) {
-        clReleaseMemObject(kd->buffers[kd->args_count].mem);
-    }
+    AllocBufferData(kd, idx);
 
     kd->buffers[idx].mem = buf;
     kd->buffers[idx].type = type;
-    kd->args_count = idx + 1 > kd->args_count ? idx + 1 : kd->args_count;
 
     return 0;
 }
@@ -295,6 +351,9 @@ static int CreateKernel(lua_State* L)
     {
         {"__gc", Kernel_destroy},
         {"set_arg_buffer", SetKernelArgBuffer},
+        {"set_arg_int", SetKernelArgInt},
+        {"set_arg_float", SetKernelArgFloat},
+        {"set_arg_vec3", SetKernelArgVec3},
         {"run", RunKernel},
         {"read", ReadKernelBuffer},
         {0, 0}

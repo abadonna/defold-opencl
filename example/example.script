@@ -1,6 +1,6 @@
 function init(self)
 
-	local buf = buffer.create(10 * 3, { -- input data for opencl kernel
+	local buf = buffer.create(10, { -- input data for opencl kernel
 		{ name = hash("data1"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
 		{ name = hash("data2"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
 		{ name = hash("data_out"), type = buffer.VALUE_TYPE_FLOAT32, count = 1 },
@@ -44,19 +44,18 @@ function init(self)
 		pprint(kernel:read(3, 10)) -- read 10 values from 3rd argument (buffer) in kernels
 	end
 
+--[[
 
-
-	--[[
 	local program = devices[2]:load_program(src)
 	local kernel = program:create_kernel("norm")
 	kernel:set_arg_buffer(1, buf, "vectors", true) 
 	kernel:set_arg_buffer(2, buf, "vectors_out", false, true) 
-
+	
 	kernel:run(1, {10})
 	
 	pprint(kernel:read(2, 10))
 
-	--]]
+--]]
 end
 
 function final(self)
