@@ -292,8 +292,6 @@ void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count
         NULL,
         NULL);
 
-        dmLogInfo("output: %f", output[0].x);
-
     lua_newtable(L);
 
     for (int i = 0; i < count; i++) {
