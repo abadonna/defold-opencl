@@ -267,10 +267,10 @@ static int RunKernel(lua_State* L)
     return 1;
 }
 
-void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count) 
+void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, float* values, uint32_t stride) 
 {
     float output[count];
-    
+
     clEnqueueReadBuffer(queue,
         buf,
         CL_TRUE,
@@ -281,6 +281,14 @@ void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count)
         NULL,
         NULL);
 
+    if (values != NULL) {
+        for (int i = 0; i < count; i++) {
+            values[0] = output[i];
+            values += stride;
+        }
+        return;
+    }
+
     lua_newtable(L);
 
     for (int i = 0; i < count; i++) {
@@ -289,7 +297,7 @@ void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count)
     }
 }
 
-void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count) 
+void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, float* values, uint32_t stride) 
 {
     cl_float3 output[count];
 
@@ -302,6 +310,16 @@ void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count
         0,
         NULL,
         NULL);
+
+    if (values != NULL) {
+        for (int i = 0; i < count; i++) {
+            values[0] = output[i].x;
+            values[1] = output[i].y;
+            values[2] = output[i].z;
+            values += stride;
+        }
+    return;
+    }
 
     lua_newtable(L);
 
@@ -321,20 +339,33 @@ void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count
 
 static int ReadKernelBuffer(lua_State* L) 
 {
-    DM_LUA_STACK_CHECK(L, 1);
+    int ret = lua_gettop(L) == 3 ? 1 : 0;
+    DM_LUA_STACK_CHECK(L, ret);
 
     kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel");
     int idx = luaL_checkint(L, 2) - 1;
     size_t count = luaL_checkint(L, 3);
 
+    float* values = NULL;
+    uint32_t stride = 0;
+    
+    if (ret == 0) { //return data in dmBuffer
+        dmBuffer::HBuffer output = dmScript::CheckBufferUnpack(L, 4);
+        dmhash_t streamName = dmScript::CheckHashOrString(L, 5);
+  
+        dmBuffer::Result dataResult = dmBuffer::GetStream(output, streamName, (void**)&values, NULL, NULL, &stride);
+        if (dataResult != dmBuffer::RESULT_OK) {
+            return DM_LUA_ERROR("can't get stream in output buffer");
+        }
+    }
   
     if (kd->buffers[idx].type == vector3) {
-        ReadVectors3(L, *kd->queue, kd->buffers[idx].mem, count);
+        ReadVectors3(L, *kd->queue, kd->buffers[idx].mem, count, values, stride);
     } else {
-        ReadFloats(L, *kd->queue, kd->buffers[idx].mem, count);
+        ReadFloats(L, *kd->queue, kd->buffers[idx].mem, count, values, stride);
     }
 
-    return 1;
+    return ret;
 }
 
 static int CreateKernel(lua_State* L)

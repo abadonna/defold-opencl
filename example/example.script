@@ -13,6 +13,8 @@ function init(self)
 	local tstream2 = buffer.get_stream(buf, hash("data2"))
 	local tstream3 = buffer.get_stream(buf, hash("vectors"))
 
+	local tstream4 = buffer.get_stream(buf, hash("data_out"))
+
 	for i = 1, 10 do
 		tstream1[i] = i;
 		tstream2[i] = i * 0.1;
@@ -41,11 +43,16 @@ function init(self)
 
 		pprint("Kernel run in " .. sec .. " seconds")
 
-		pprint(kernel:read(3, 10)) -- read 10 values from 3rd argument (buffer) in kernels
+		
+		pprint(kernel:read(3, 10)) -- read 10 values from 3rd argument (buffer) as lua table
+
+		--kernel:read(3, 10, buf, "data_out") -- read into buffer
+		--for i = 1, 10 do
+		--	pprint(tstream4[i])
+		--end
 	end
 
---[[
-
+	--[[
 	local program = devices[2]:load_program(src)
 	local kernel = program:create_kernel("norm")
 	kernel:set_arg_buffer(1, buf, "vectors", true) 
@@ -54,8 +61,8 @@ function init(self)
 	kernel:run(1, {10})
 	
 	pprint(kernel:read(2, 10))
+	--]]
 
---]]
 end
 
 function final(self)
