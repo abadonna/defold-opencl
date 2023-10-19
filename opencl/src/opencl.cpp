@@ -86,6 +86,17 @@ void AllocBufferData(kernel_data* kd, int idx)
     kd->args_count = idx + 1 > kd->args_count ? idx + 1 : kd->args_count;
 }
 
+static int SetKernelArgNull(lua_State* L)
+{
+    kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel"); 
+    int idx = luaL_checkint(L, 2) - 1; 
+    size_t size = luaL_checknumber(L, 3); 
+    clSetKernelArg(kd->kernel, idx, size, NULL);
+    AllocBufferData(kd, idx);
+    kd->buffers[idx].mem = NULL;
+    return 0;
+}
+
 static int SetKernelArgInt(lua_State* L)
 {
     kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel"); 
@@ -355,6 +366,7 @@ static int CreateKernel(lua_State* L)
         {"set_arg_int", SetKernelArgInt},
         {"set_arg_float", SetKernelArgFloat},
         {"set_arg_vec3", SetKernelArgVec3},
+        {"set_arg_null", SetKernelArgNull},
         {"run", RunKernel},
         {"read", ReadKernelBuffer},
         {0, 0}
