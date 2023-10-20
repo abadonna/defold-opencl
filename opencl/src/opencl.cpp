@@ -6,8 +6,7 @@
 // include the Defold SDK
 #include <dmsdk/sdk.h>
 #include <CL/cl.h>
-
-extern double getCPUTime();  
+#include <chrono>
 
 struct device_data {
     cl_device_id id;
@@ -231,6 +230,8 @@ void LoadWorkSize(lua_State* L, size_t* array, int index, cl_uint dim)
 
 static int RunKernel(lua_State* L)
 {
+    using namespace std::chrono;
+    
     DM_LUA_STACK_CHECK(L, 1);
 
     kernel_data* kd = (kernel_data*)luaL_checkudata(L, 1, "kernel");
@@ -250,7 +251,7 @@ static int RunKernel(lua_State* L)
         local = local_work_size;
     }
 
-    double rtime = getCPUTime();
+    steady_clock::time_point t1 = steady_clock::now();
 
     cl_int status = clEnqueueNDRangeKernel(*kd->queue, kd->kernel, dim, NULL, global_work_size, local, 0, NULL, NULL);
     //dmLogInfo("execution status: %d", status);
@@ -261,8 +262,10 @@ static int RunKernel(lua_State* L)
 
     clFinish(*kd->queue);
 
-    rtime = getCPUTime() - rtime;
-    lua_pushnumber(L, rtime);
+    steady_clock::time_point t2 = steady_clock::now();
+    duration<double> time_span = duration_cast< duration<double> >(t2 - t1);
+    
+    lua_pushnumber(L, time_span.count());
 
     return 1;
 }
