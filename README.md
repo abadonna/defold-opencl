@@ -6,7 +6,6 @@ Open your game.project file and add in the dependencies:
 
 ```
 https://github.com/abadonna/defold-opencl/archive/master.zip
-
 ```
 
 ## Documentation
@@ -52,8 +51,8 @@ Local items size can be omitted. Number of work groups will be created = global_
 Finally we need to read data back to lua.
 
 ```
-resutl = kernel:read(index, count) --read count items from kernel arguments at index
-resutl = kernel:read(index, count, buffer, stream_name) --read count items from kernel arguments at index to dmBuffer (faster)
+result_table = kernel:read(index, count) -- read count items from kernel arguments at index and returns as table
+kernel:read(index, count, buffer, stream_name) -- read count items from kernel arguments at index to dmBuffer (faster)
 ```
 
 For more advanced examples check https://github.com/abadonna/defold-light-probes/tree/opencl
