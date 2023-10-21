@@ -465,11 +465,20 @@ static int LoadProgram(lua_State* L)
 
 static int GetDevices(lua_State* L)
 {
+    bool gpu = false;
+
+    if (lua_gettop(L) == 1) {
+        gpu = lua_toboolean(L, 1); 
+        lua_pop(L, 1);
+    }
+    
+    cl_device_type type = gpu ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_ALL;
+    
     cl_uint num_devices;
-    cl_int status = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_ALL, 0, NULL, &num_devices);
+    cl_int status = clGetDeviceIDs(platform_id, type, 0, NULL, &num_devices);
 
     cl_device_id* devices = (cl_device_id *)malloc(sizeof(cl_device_id) * num_devices);
-    clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_ALL, num_devices, devices, NULL);
+    clGetDeviceIDs(platform_id, type, num_devices, devices, NULL);
 
     lua_newtable(L);
 
