@@ -5,6 +5,10 @@
 
 // include the Defold SDK
 #include <dmsdk/sdk.h>
+
+#if defined(DM_PLATFORM_OSX) || defined(DM_PLATFORM_WINDOWS)
+//TODO linux and other platforms
+
 #include <CL/cl.h>
 #include <chrono>
 
@@ -575,8 +579,6 @@ static int GetDevices(lua_State* L)
     return 1;
 }
 
-
-
 // Functions exposed to Lua
 static const luaL_reg Module_methods[] =
 {
@@ -595,12 +597,6 @@ static void LuaInit(lua_State* L)
     assert(top == lua_gettop(L));
 }
 
-static dmExtension::Result AppInitializeExtension(dmExtension::AppParams* params)
-{
-    dmLogInfo("AppInitializeMyExtension");
-    return dmExtension::RESULT_OK;
-}
-
 static dmExtension::Result InitializeExtension(dmExtension::Params* params)
 {
     // Init Lua
@@ -610,6 +606,23 @@ static dmExtension::Result InitializeExtension(dmExtension::Params* params)
     cl_uint num_platforms;
     cl_int status = clGetPlatformIDs(1, &platform_id, &num_platforms);
     
+    return dmExtension::RESULT_OK;
+}
+
+#else
+
+static dmExtension::Result InitializeExtension(dmExtension::Params* params)
+{
+    // Init Lua
+    dmLogInfo("Registered %s Extension", MODULE_NAME);
+    return dmExtension::RESULT_OK;
+}
+
+#endif // platforms
+
+static dmExtension::Result AppInitializeExtension(dmExtension::AppParams* params)
+{
+    dmLogInfo("AppInitializeMyExtension");
     return dmExtension::RESULT_OK;
 }
 
@@ -653,8 +666,13 @@ static void OnEventExtension(dmExtension::Params* params, const dmExtension::Eve
     }
 }
 
+
+
 // Defold SDK uses a macro for setting up extension entry points:
 //
 // DM_DECLARE_EXTENSION(symbol, name, app_init, app_final, init, update, on_event, final)
 
+
+
 DM_DECLARE_EXTENSION(OpenCL, LIB_NAME, AppInitializeExtension, AppFinalizeExtension, InitializeExtension, NULL, NULL, FinalizeExtension)
+
