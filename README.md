@@ -41,6 +41,8 @@ kernel:set_arg_vec3(index, value) -- set vmath.vector3
 kernel:set_arg_null(index, size) -- set null for local memory buffer
 ```
 
+If buffer stream contains 3 components per item it will be passed to kernel as array of float3
+
 Now we can run kernel with
 
 ```
