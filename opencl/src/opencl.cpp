@@ -227,81 +227,22 @@ static int SetKernelArgBuffer(lua_State* L)
     dmBuffer::GetStreamType(input, streamName, &valuetype, &components);
     const char* stype = dmBuffer::GetValueTypeString(valuetype);
     
-    
     //dmLogInfo("buffer %d, %d, %d", count,components, stride );
 
     AllocBufferData(kd, idx);
 
     if ((components == 3) && (strcmp(stype,"VALUE_TYPE_UINT8") == 0)) { //create array of uchar3!
         CreateBufferV3<unsigned char, cl_uchar3>(idx, count, stride, values, kd, flags, uchar3);
-        /*
-        type = uchar3;
-        unsigned char *data =  (unsigned char*)values;
-        cl_uchar3 array[count];
-        for (uint i = 0; i < count; ++i) {
-            array[i].x = data[0];
-            array[i].y = data[1];
-            array[i].z = data[2];
-            data += stride;
-        }
-
-        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_uchar3) * count, array, NULL);
-        */
         
     } else if (components == 3) { //create array of float3!
         CreateBufferV3<float, cl_float3>(idx, count, stride, values, kd, flags, float3);
-        /*
-        type = float3;
-        cl_float3 array[count];
-        float *data =  (float*)values;
         
-        for (uint i = 0; i < count; ++i) {
-            array[i].x = data[0];
-            array[i].y = data[1];
-            array[i].z = data[2];
-            data += stride;
-        }
-
-        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float3) * count, array, NULL);
-        */
-
     } else if (strcmp(stype,"VALUE_TYPE_UINT8") == 0) {
         CreateBuffer<cl_uchar>(idx, count, stride, components, values, kd, flags, uchar1);
-        /*
-        type = uchar1;
-        cl_uchar array[count * components];
-        cl_uchar *data = (cl_uchar*)values;
-        for (uint i = 0; i < count; ++i) {
-            for (int c = 0; c < components; ++c)
-            {
-                array[i * components + c] = data[c];
-            }
-
-            data += stride;
-        }
-
-        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_uchar) * count * components, array, NULL);
-        */
+        
     } else {
         CreateBuffer<float>(idx, count, stride, components, values, kd, flags, float1);
-        /*
-        float array[count * components];
-        float *data =  (float*)values;
-        for (uint i = 0; i < count; ++i) {
-            for (int c = 0; c < components; ++c)
-            {
-                //dmLogInfo("set %d, %f", i, values[c]);
-                array[i * components + c] = data[c];
-            }
-
-            data += stride;
-        }
-
-        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float) * count * components, array, NULL);
-        */
-        
     }
-    
     
 
     return 0;
