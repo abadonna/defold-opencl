@@ -25,8 +25,10 @@ struct program_data {
 };
 
 enum BUFFER_TYPE {
-    float_number,
-    vector3
+    float1,
+    uchar1,
+    float3,
+    uchar3
 };
 
 struct buffer_data {
@@ -148,6 +150,46 @@ static int SetKernelArgVec3(lua_State* L)
     return 0;
 }
 
+template <typename T, typename CLT>
+void CreateBufferV3(int idx, uint32_t count, uint32_t stride, void* values, kernel_data* kd, cl_mem_flags flags, BUFFER_TYPE type)
+{
+    T *data =  (T*)values;
+    CLT array[count];
+    for (uint i = 0; i < count; ++i) {
+        array[i].x = data[0];
+        array[i].y = data[1];
+        array[i].z = data[2];
+        data += stride;
+    }
+
+    cl_mem buf = clCreateBuffer(*kd->context, flags, sizeof(CLT) * count, array, NULL);
+    clSetKernelArg(kd->kernel, idx, sizeof(cl_mem), &buf);
+
+    kd->buffers[idx].mem = buf;
+    kd->buffers[idx].type = type;
+}
+
+template <typename T>
+void CreateBuffer(int idx, uint32_t count, uint32_t stride, uint32_t components, void* values, kernel_data* kd, cl_mem_flags flags, BUFFER_TYPE type)
+{
+    T array[count * components];
+    T *data = (T*)values;
+    for (uint i = 0; i < count; ++i) {
+        for (int c = 0; c < components; ++c)
+        {
+            array[i * components + c] = data[c];
+        }
+
+        data += stride;
+    }
+
+    cl_mem buf = clCreateBuffer(*kd->context, flags, sizeof(T) * count * components, array, NULL);
+    clSetKernelArg(kd->kernel, idx, sizeof(cl_mem), &buf);
+
+    kd->buffers[idx].mem = buf;
+    kd->buffers[idx].type = type;
+}
+
 static int SetKernelArgBuffer(lua_State* L)
 {
     //TODO: different value types, check strem dmBuffer::GetStreamType/dmBuffer::GetValueTypeString
@@ -171,7 +213,7 @@ static int SetKernelArgBuffer(lua_State* L)
         flags |= CL_MEM_READ_WRITE;
     }
 
-    float* values = 0x0;
+    void* values = 0x0;
     uint32_t count = 0;
     uint32_t components = 0;
     uint32_t stride = 0;
@@ -179,45 +221,88 @@ static int SetKernelArgBuffer(lua_State* L)
     if (dataResult != dmBuffer::RESULT_OK) {
         return DM_LUA_ERROR("can't get stream");
     }
+
+    dmBuffer::ValueType valuetype;
+    
+    dmBuffer::GetStreamType(input, streamName, &valuetype, &components);
+    const char* stype = dmBuffer::GetValueTypeString(valuetype);
+    
     
     //dmLogInfo("buffer %d, %d, %d", count,components, stride );
 
-    enum BUFFER_TYPE type = float_number;
-    cl_mem buf;
-    if (components == 3) { //create array of vec3!
-        type = vector3;
+    AllocBufferData(kd, idx);
+
+    if ((components == 3) && (strcmp(stype,"VALUE_TYPE_UINT8") == 0)) { //create array of uchar3!
+        CreateBufferV3<unsigned char, cl_uchar3>(idx, count, stride, values, kd, flags, uchar3);
+        /*
+        type = uchar3;
+        unsigned char *data =  (unsigned char*)values;
+        cl_uchar3 array[count];
+        for (uint i = 0; i < count; ++i) {
+            array[i].x = data[0];
+            array[i].y = data[1];
+            array[i].z = data[2];
+            data += stride;
+        }
+
+        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_uchar3) * count, array, NULL);
+        */
+        
+    } else if (components == 3) { //create array of float3!
+        CreateBufferV3<float, cl_float3>(idx, count, stride, values, kd, flags, float3);
+        /*
+        type = float3;
         cl_float3 array[count];
-        for (int i = 0; i < count; ++i) {
-            array[i].x = values[0];
-            array[i].y = values[1];
-            array[i].z = values[2];
-            values += stride;
+        float *data =  (float*)values;
+        
+        for (uint i = 0; i < count; ++i) {
+            array[i].x = data[0];
+            array[i].y = data[1];
+            array[i].z = data[2];
+            data += stride;
         }
 
         buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float3) * count, array, NULL);
+        */
 
+    } else if (strcmp(stype,"VALUE_TYPE_UINT8") == 0) {
+        CreateBuffer<cl_uchar>(idx, count, stride, components, values, kd, flags, uchar1);
+        /*
+        type = uchar1;
+        cl_uchar array[count * components];
+        cl_uchar *data = (cl_uchar*)values;
+        for (uint i = 0; i < count; ++i) {
+            for (int c = 0; c < components; ++c)
+            {
+                array[i * components + c] = data[c];
+            }
+
+            data += stride;
+        }
+
+        buf = clCreateBuffer(*kd->context, flags, sizeof(cl_uchar) * count * components, array, NULL);
+        */
     } else {
+        CreateBuffer<float>(idx, count, stride, components, values, kd, flags, float1);
+        /*
         float array[count * components];
-
-        for (int i = 0; i < count; ++i) {
+        float *data =  (float*)values;
+        for (uint i = 0; i < count; ++i) {
             for (int c = 0; c < components; ++c)
             {
                 //dmLogInfo("set %d, %f", i, values[c]);
-                array[i * components + c] = values[c];
+                array[i * components + c] = data[c];
             }
 
-            values += stride;
+            data += stride;
         }
 
         buf = clCreateBuffer(*kd->context, flags, sizeof(cl_float) * count * components, array, NULL);
+        */
+        
     }
     
-    clSetKernelArg(kd->kernel, idx, sizeof(cl_mem), &buf);
-
-    AllocBufferData(kd, idx);
-
-    kd->buffers[idx].mem = buf;
-    kd->buffers[idx].type = type;
+    
 
     return 0;
 }
@@ -274,15 +359,16 @@ static int RunKernel(lua_State* L)
     return 1;
 }
 
-void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, float* values, uint32_t stride) 
+template <typename T>
+void Read(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, T* values, uint32_t stride) 
 {
-    float output[count];
+    T output[count];
 
     clEnqueueReadBuffer(queue,
         buf,
         CL_TRUE,
         0,
-        sizeof(float) * count,
+        sizeof(T) * count,
         output,
         0,
         NULL,
@@ -304,45 +390,47 @@ void ReadFloats(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, 
     }
 }
 
-void ReadVectors3(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, float* values, uint32_t stride) 
+template <typename T, typename CLT>
+void ReadVectors(lua_State* L, cl_command_queue queue, cl_mem buf, size_t count, T *values, uint32_t stride) 
 {
-    cl_float3 output[count];
+    CLT output[count];
 
     clEnqueueReadBuffer(queue,
         buf,
         CL_TRUE,
         0,
-        sizeof(cl_float3) * count,
+        sizeof(CLT) * count,
         output,
         0,
         NULL,
         NULL);
 
-    if (values != NULL) {
-        for (int i = 0; i < count; i++) {
-            values[0] = output[i].x;
-            values[1] = output[i].y;
-            values[2] = output[i].z;
-            values += stride;
+        if (values != NULL) {
+            for (uint i = 0; i < count; i++) {
+                values[0] = output[i].x;
+                values[1] = output[i].y;
+                values[2] = output[i].z;
+
+                values += stride;
+            }
+            return;
         }
-    return;
-    }
 
-    lua_newtable(L);
-
-    for (int i = 0; i < count; i++) {
         lua_newtable(L);
-       
-        lua_pushnumber(L, output[i].x);
-        lua_rawseti(L, -2, 1);
-        lua_pushnumber(L, output[i].y);
-        lua_rawseti(L, -2, 2);
-        lua_pushnumber(L, output[i].z);
-        lua_rawseti(L, -2, 3);
 
-        lua_rawseti(L, -2, i + 1);
+        for (int i = 0; i < count; i++) {
+            lua_newtable(L);
+
+            lua_pushnumber(L, output[i].x);
+            lua_rawseti(L, -2, 1);
+            lua_pushnumber(L, output[i].y);
+            lua_rawseti(L, -2, 2);
+            lua_pushnumber(L, output[i].z);
+            lua_rawseti(L, -2, 3);
+
+            lua_rawseti(L, -2, i + 1);
+        }
     }
-}
 
 static int ReadKernelBuffer(lua_State* L) 
 {
@@ -353,7 +441,7 @@ static int ReadKernelBuffer(lua_State* L)
     int idx = luaL_checkint(L, 2) - 1;
     size_t count = luaL_checkint(L, 3);
 
-    float* values = NULL;
+    void* values = NULL;
     uint32_t stride = 0;
     
     if (ret == 0) { //return data in dmBuffer
@@ -365,12 +453,22 @@ static int ReadKernelBuffer(lua_State* L)
             return DM_LUA_ERROR("can't get stream in output buffer");
         }
     }
-  
-    if (kd->buffers[idx].type == vector3) {
-        ReadVectors3(L, *kd->queue, kd->buffers[idx].mem, count, values, stride);
-    } else {
-        ReadFloats(L, *kd->queue, kd->buffers[idx].mem, count, values, stride);
+
+    switch(kd->buffers[idx].type) {
+        case float3: 
+            ReadVectors<float, cl_float3>(L, *kd->queue, kd->buffers[idx].mem, count, (float*)values, stride);
+            break;
+        case uchar3: 
+            ReadVectors<unsigned char, cl_uchar3>(L, *kd->queue, kd->buffers[idx].mem, count, (unsigned char*)values, stride);
+            break;
+        case uchar1: 
+            Read<unsigned char>(L, *kd->queue, kd->buffers[idx].mem, count, (unsigned char*)values, stride);
+            break;
+        case float1: 
+            Read<float>(L, *kd->queue, kd->buffers[idx].mem, count, (float*)values, stride);
+            break;
     }
+   
 
     return ret;
 }
