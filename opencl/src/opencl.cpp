@@ -27,8 +27,10 @@ struct program_data {
 enum BUFFER_TYPE {
     float1,
     uchar1,
+    uint1,
     float3,
-    uchar3
+    uchar3,
+    uint3
 };
 
 struct buffer_data {
@@ -234,12 +236,18 @@ static int SetKernelArgBuffer(lua_State* L)
     if ((components == 3) && (strcmp(stype,"VALUE_TYPE_UINT8") == 0)) { //create array of uchar3!
         CreateBufferV3<unsigned char, cl_uchar3>(idx, count, stride, values, kd, flags, uchar3);
         
+    } else if ((components == 3) && (strcmp(stype,"VALUE_TYPE_UINT32") == 0)) { 
+        CreateBufferV3<uint32_t, cl_uint3>(idx, count, stride, values, kd, flags, uint3);
+
     } else if (components == 3) { //create array of float3!
         CreateBufferV3<float, cl_float3>(idx, count, stride, values, kd, flags, float3);
         
     } else if (strcmp(stype,"VALUE_TYPE_UINT8") == 0) {
         CreateBuffer<cl_uchar>(idx, count, stride, components, values, kd, flags, uchar1);
         
+    } else if (strcmp(stype,"VALUE_TYPE_UINT32") == 0) {
+        CreateBuffer<cl_uint>(idx, count, stride, components, values, kd, flags, uint1);
+
     } else {
         CreateBuffer<float>(idx, count, stride, components, values, kd, flags, float1);
     }
@@ -402,8 +410,14 @@ static int ReadKernelBuffer(lua_State* L)
         case uchar3: 
             ReadVectors<unsigned char, cl_uchar3>(L, *kd->queue, kd->buffers[idx].mem, count, (unsigned char*)values, stride);
             break;
+        case uint3: 
+            ReadVectors<uint32_t, cl_uint3>(L, *kd->queue, kd->buffers[idx].mem, count, (uint32_t*)values, stride);
+            break;
         case uchar1: 
             Read<unsigned char>(L, *kd->queue, kd->buffers[idx].mem, count, (unsigned char*)values, stride);
+            break;
+        case uint1: 
+            Read<uint32_t>(L, *kd->queue, kd->buffers[idx].mem, count, (uint32_t*)values, stride);
             break;
         case float1: 
             Read<float>(L, *kd->queue, kd->buffers[idx].mem, count, (float*)values, stride);
