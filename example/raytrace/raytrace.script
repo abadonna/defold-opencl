@@ -26,14 +26,6 @@ function init(self)
 
 	local mesh = resource.get_buffer(self.monkey)
 
-
-	---TODO: move camera, not mesh
-	local position = buffer.get_stream(mesh, "position")
-	local i = 1
-	while i < #position - 3 do
-		position[i + 2] = position[i + 2] - 10;
-		i = i + 3
-	end
 	
 	kernel:set_arg_buffer(4, mesh, "position", true) 
 	kernel:set_arg_buffer(5, mesh, "normal", true) 
@@ -46,4 +38,5 @@ function init(self)
 
 
 	resource.set_texture(texture, header, buf)
+	
 end

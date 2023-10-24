@@ -137,9 +137,9 @@ __kernel void trace_scene(
 
 	p *= tan_hfov;
 	p.x *= aspect;
-	p.z = -1.f;
+	p.z = 9;
 
-	float3 origin = float3(0., 0, 0); //camera position 
+	float3 origin = (float3)(0, 0, 10); //camera position 
 	float3 dir = normalize(p - origin);
 
 	float value = cast_ray(&origin, &dir, num_faces, vertices, normals);
