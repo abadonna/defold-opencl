@@ -2,6 +2,9 @@
 name: "OpenCL"
 
 platforms:
+    arm64-osx:
+        context:
+            frameworks: ["OpenCL"]
     x86_64-osx:
         context:
             frameworks: ["OpenCL"]

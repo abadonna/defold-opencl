@@ -110,9 +110,7 @@ bool rayTriangleIntersect( //scratchapixel.com
 			float3 light_dir = normalize(light - point);
 
 			float diff = max(0.f, dot(normal, light_dir));
-			float3 hit = point +  normal * 0.01f; 
-			float d = FLT_MAX;
-			float2 uv2;
+			//float3 hit = point +  normal * 0.01f; 
 
 			result = diff;
 		}
